@@ -42,8 +42,9 @@ export async function scanPhoto(file: Blob): Promise<PhotoResult> {
     if (context === null) throw new Error("2D canvas context unavailable");
     for (const size of PHOTO_SIZES) {
       const scale = Math.min(1, size / Math.max(bitmap.width, bitmap.height));
-      canvas.width = Math.round(bitmap.width * scale);
-      canvas.height = Math.round(bitmap.height * scale);
+      // A very narrow image would otherwise round to a zero-size canvas, which cannot be read.
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
       // Transparent pixels would otherwise reach the decoder as black.
       context.fillStyle = "#fff";
       context.fillRect(0, 0, canvas.width, canvas.height);
