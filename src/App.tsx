@@ -3,6 +3,7 @@ import { createEffect, createSignal, For, type JSX, onCleanup, Show } from "soli
 import { decodeEpsonPayload, type EpsonRecord, type Interfaces, type Ipv4, type Mac, type ParseError, unmask } from "./epson";
 import { describeParseError, formatTime, locale, locales, setLocale, t } from "./i18n";
 import { type CameraResult, type CameraScan, type PhotoResult, scanCamera, scanPhoto } from "./scanner";
+import { createLatest } from "./latest";
 import { wifiQrText } from "./wifi";
 
 type Status =
@@ -125,6 +126,8 @@ export function App() {
   const [status, setStatus] = createSignal<Status>({ kind: "prompt" });
   const [scan, setScan] = createSignal<Scan | null>(null);
   const [camera, setCamera] = createSignal<CameraScan | null>(null);
+  // Photo reads and camera starts overlap; only the latest one may report.
+  const requests = createLatest();
   let video!: HTMLVideoElement;
 
   createEffect(() => {
@@ -165,16 +168,17 @@ export function App() {
       setStatus({ kind: "prompt" });
       return;
     }
+    const token = requests.begin();
     try {
       const started = await scanCamera(video, (result) => {
         setCamera(null);
-        handle(result);
+        if (requests.isCurrent(token)) handle(result);
       });
       setCamera(started);
-      setStatus({ kind: "searching" });
+      if (requests.isCurrent(token)) setStatus({ kind: "searching" });
     } catch {
       // Permission denied, no camera, or an insecure context.
-      setStatus({ kind: "no-camera" });
+      if (requests.isCurrent(token)) setStatus({ kind: "no-camera" });
     }
   }
 
@@ -182,9 +186,12 @@ export function App() {
     const input = event.currentTarget;
     const file = input.files?.[0];
     if (file === undefined) return;
+    const token = requests.begin();
     setStatus({ kind: "reading" });
     try {
-      handle(await scanPhoto(file));
+      const result = await scanPhoto(file);
+      // A photo picked later, or a camera started meanwhile, takes precedence.
+      if (requests.isCurrent(token)) handle(result);
     } finally {
       // Clearing the input lets the same file be picked again.
       input.value = "";
