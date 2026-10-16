@@ -13,6 +13,7 @@ export const es: typeof en = {
     reading: "Leyendo la foto...",
     read: "Código leído.",
     noCamera: "Cámara no disponible. Usá la foto.",
+    cameraFailed: "La cámara dejó de funcionar. Probá de nuevo o usá la foto.",
     notFound: "No encontré el QR. Probá más de frente y más cerca.",
   },
   result: {

@@ -12,6 +12,7 @@ export const en = {
     reading: "Reading the photo...",
     read: "Code read.",
     noCamera: "Camera not available. Use a photo.",
+    cameraFailed: "The camera stopped working. Try again or use a photo.",
     notFound: "No QR code found. Try straighter and closer.",
   },
   result: {
