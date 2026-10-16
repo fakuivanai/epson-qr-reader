@@ -15,6 +15,7 @@ export const es: typeof en = {
     noCamera: "Cámara no disponible. Usá la foto.",
     cameraFailed: "La cámara dejó de funcionar. Probá de nuevo o usá la foto.",
     notFound: "No encontré el QR. Probá más de frente y más cerca.",
+    unreadableImage: "No se pudo abrir el archivo como imagen.",
   },
   result: {
     heading: "Proyector",

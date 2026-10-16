@@ -2,17 +2,17 @@ import { encodeQR } from "qr";
 import { createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { decodeEpsonPayload, type EpsonRecord, type Interfaces, type Ipv4, type Mac, type ParseError, unmask } from "./epson";
 import { describeParseError, formatTime, locale, locales, setLocale, t } from "./i18n";
-import { type CameraScan, type CameraResult, scanCamera, scanPhoto } from "./scanner";
+import { type CameraResult, type CameraScan, type PhotoResult, scanCamera, scanPhoto } from "./scanner";
 import { wifiQrText } from "./wifi";
 
 type Status =
   | { kind: "prompt" | "searching" | "reading" | "read" | "copied" | "selected-to-copy" }
-  | { kind: "no-camera" | "camera-failed" | "not-found" | "not-epson" }
+  | { kind: "no-camera" | "camera-failed" | "not-found" | "not-epson" | "unreadable-image" }
   | { kind: "parse-error"; error: ParseError };
 
 type Scan = { bytes: Uint8Array; record: EpsonRecord; at: Date };
 
-const isWarning = (s: Status) => ["no-camera", "camera-failed", "not-found", "not-epson", "parse-error"].includes(s.kind);
+const isWarning = (s: Status) => ["no-camera", "camera-failed", "not-found", "not-epson", "unreadable-image", "parse-error"].includes(s.kind);
 
 function statusText(s: Status): string {
   switch (s.kind) {
@@ -34,6 +34,8 @@ function statusText(s: Status): string {
       return t("scan.cameraFailed");
     case "not-found":
       return t("scan.notFound");
+    case "unreadable-image":
+      return t("scan.unreadableImage");
     case "not-epson":
       return t("error.notEpson");
     case "parse-error":
@@ -141,12 +143,17 @@ export function App() {
     setStatus({ kind: "read" });
   }
 
-  function handle(result: CameraResult) {
+  function handle(result: CameraResult | PhotoResult) {
     if (result.ok) {
       accept(result.bytes);
       return;
     }
-    const kinds = { "no-qr": "not-found", "not-binary": "not-epson", "camera-failed": "camera-failed" } as const;
+    const kinds = {
+      "no-qr": "not-found",
+      "not-binary": "not-epson",
+      "camera-failed": "camera-failed",
+      "unreadable-image": "unreadable-image",
+    } as const;
     setStatus({ kind: kinds[result.error.kind] });
   }
 
@@ -176,8 +183,12 @@ export function App() {
     const file = input.files?.[0];
     if (file === undefined) return;
     setStatus({ kind: "reading" });
-    handle(await scanPhoto(file));
-    input.value = "";
+    try {
+      handle(await scanPhoto(file));
+    } finally {
+      // Clearing the input lets the same file be picked again.
+      input.value = "";
+    }
   }
 
   async function copy(text: string, element: HTMLElement) {

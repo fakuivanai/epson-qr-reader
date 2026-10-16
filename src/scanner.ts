@@ -18,6 +18,7 @@ function toBytes(text: string): Uint8Array | null {
 
 export type ScanError = { kind: "no-qr" } | { kind: "not-binary" };
 export type ScanResult = { ok: true; bytes: Uint8Array } | { ok: false; error: ScanError };
+export type PhotoResult = ScanResult | { ok: false; error: { kind: "unreadable-image" } };
 
 function fromText(text: string): ScanResult {
   const bytes = toBytes(text);
@@ -27,8 +28,14 @@ function fromText(text: string): ScanResult {
 // Large phone photos decode more reliably after downscaling.
 const PHOTO_SIZES = [1200, 1800, 800, 2400];
 
-export async function scanPhoto(file: Blob): Promise<ScanResult> {
-  const bitmap = await createImageBitmap(file);
+export async function scanPhoto(file: Blob): Promise<PhotoResult> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // The browser could not decode the file as an image.
+    return { ok: false, error: { kind: "unreadable-image" } };
+  }
   try {
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", { willReadFrequently: true });

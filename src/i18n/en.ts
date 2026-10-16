@@ -14,6 +14,7 @@ export const en = {
     noCamera: "Camera not available. Use a photo.",
     cameraFailed: "The camera stopped working. Try again or use a photo.",
     notFound: "No QR code found. Try straighter and closer.",
+    unreadableImage: "That file could not be opened as an image.",
   },
   result: {
     heading: "Projector",
