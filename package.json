@@ -1,0 +1,24 @@
+{
+  "name": "epson-qr-reader",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@solid-primitives/i18n": "2.2.1",
+    "qr": "0.7.2",
+    "solid-js": "1.9.17"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vite-plugin-solid": "2.11.14",
+    "vitest": "5.0.5"
+  }
+}
