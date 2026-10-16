@@ -64,8 +64,23 @@ export async function scanPhoto(file: Blob): Promise<PhotoResult> {
 export type CameraScan = { stop: () => void };
 export type CameraResult = ScanResult | { ok: false; error: { kind: "camera-failed" } };
 
+// rearCamera attaches its stream to the video element as it starts. Starts run
+// one at a time so a superseded start that finishes late cannot replace the
+// stream of a newer one.
+// The chain only tracks completion, so it never rejects.
+let previousStart: Promise<void> = Promise.resolve();
+
 /** Scans the rear camera until a symbol decodes or reading fails, then stops and reports it. */
-export async function scanCamera(video: HTMLVideoElement, onResult: (result: CameraResult) => void): Promise<CameraScan> {
+export function scanCamera(video: HTMLVideoElement, onResult: (result: CameraResult) => void): Promise<CameraScan> {
+  const start = previousStart.then(() => startCamera(video, onResult));
+  previousStart = start.then(
+    () => undefined,
+    () => undefined,
+  );
+  return start;
+}
+
+async function startCamera(video: HTMLVideoElement, onResult: (result: CameraResult) => void): Promise<CameraScan> {
   const camera = await rearCamera(video);
   const canvas = new QRCanvas({}, { textDecoder: latin1 });
   let busy = false;
