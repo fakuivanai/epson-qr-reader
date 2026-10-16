@@ -12,6 +12,7 @@ type Status =
   | { kind: "parse-error"; error: ParseError };
 
 type Scan = { bytes: Uint8Array; record: EpsonRecord; at: Date };
+type CameraState = { kind: "idle" } | { kind: "starting" } | { kind: "running"; session: CameraScan };
 
 const isWarning = (s: Status) => ["no-camera", "camera-failed", "not-found", "not-epson", "unreadable-image", "parse-error"].includes(s.kind);
 
@@ -125,16 +126,27 @@ function WifiQr(props: { record: EpsonRecord }) {
 export function App() {
   const [status, setStatus] = createSignal<Status>({ kind: "prompt" });
   const [scan, setScan] = createSignal<Scan | null>(null);
-  const [camera, setCamera] = createSignal<CameraScan | null>(null);
+  const [camera, setCamera] = createSignal<CameraState>({ kind: "idle" });
   // Photo reads and camera starts overlap; only the latest one may report.
   const requests = createLatest();
+  let disposed = false;
   let video!: HTMLVideoElement;
 
   createEffect(() => {
     document.documentElement.lang = locale();
     document.title = t("title");
   });
-  onCleanup(() => camera()?.stop());
+
+  function stopCamera() {
+    const state = camera();
+    if (state.kind === "running") state.session.stop();
+    setCamera({ kind: "idle" });
+  }
+
+  onCleanup(() => {
+    disposed = true;
+    stopCamera();
+  });
 
   function accept(bytes: Uint8Array) {
     const result = decodeEpsonPayload(bytes);
@@ -161,25 +173,37 @@ export function App() {
   }
 
   async function toggleCamera() {
-    const running = camera();
-    if (running !== null) {
-      running.stop();
-      setCamera(null);
+    const state = camera();
+    if (state.kind === "starting") return;
+    if (state.kind === "running") {
+      stopCamera();
+      requests.begin();
       setStatus({ kind: "prompt" });
       return;
     }
     const token = requests.begin();
+    setCamera({ kind: "starting" });
+    let session: CameraScan;
     try {
-      const started = await scanCamera(video, (result) => {
-        setCamera(null);
+      session = await scanCamera(video, (result) => {
+        setCamera({ kind: "idle" });
         if (requests.isCurrent(token)) handle(result);
       });
-      setCamera(started);
-      if (requests.isCurrent(token)) setStatus({ kind: "searching" });
     } catch {
       // Permission denied, no camera, or an insecure context.
-      if (requests.isCurrent(token)) setStatus({ kind: "no-camera" });
+      if (requests.isCurrent(token)) {
+        setCamera({ kind: "idle" });
+        setStatus({ kind: "no-camera" });
+      }
+      return;
     }
+    // A photo picked during startup, or leaving the page, supersedes this camera.
+    if (disposed || !requests.isCurrent(token)) {
+      session.stop();
+      return;
+    }
+    setCamera({ kind: "running", session });
+    setStatus({ kind: "searching" });
   }
 
   async function readPhoto(event: Event & { currentTarget: HTMLInputElement }) {
@@ -187,6 +211,7 @@ export function App() {
     const file = input.files?.[0];
     if (file === undefined) return;
     const token = requests.begin();
+    stopCamera();
     setStatus({ kind: "reading" });
     try {
       const result = await scanPhoto(file);
@@ -239,17 +264,18 @@ export function App() {
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="cursor-pointer rounded-lg bg-accent px-4 py-2 font-semibold text-on-accent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            class="cursor-pointer rounded-lg bg-accent px-4 py-2 font-semibold text-on-accent focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-50"
+            disabled={camera().kind === "starting"}
             onClick={() => void toggleCamera()}
           >
-            {camera() === null ? t("scan.camera") : t("scan.stop")}
+            {camera().kind === "running" ? t("scan.stop") : t("scan.camera")}
           </button>
           <label class={buttonSecondary} for="photo">
             {t("scan.photo")}
           </label>
           <input id="photo" type="file" accept="image/*" capture="environment" class="sr-only" onChange={(e) => void readPhoto(e)} />
         </div>
-        <video ref={video} playsinline muted class="w-full rounded-lg bg-black" hidden={camera() === null} />
+        <video ref={video} playsinline muted class="w-full rounded-lg bg-black" hidden={camera().kind !== "running"} />
         <p class={`text-sm ${isWarning(status()) ? "text-warn" : status().kind === "read" || status().kind === "copied" ? "text-ok" : "text-muted"}`} aria-live="polite">
           {statusText(status())}
         </p>
