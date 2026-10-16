@@ -44,6 +44,9 @@ export async function scanPhoto(file: Blob): Promise<PhotoResult> {
       const scale = Math.min(1, size / Math.max(bitmap.width, bitmap.height));
       canvas.width = Math.round(bitmap.width * scale);
       canvas.height = Math.round(bitmap.height * scale);
+      // Transparent pixels would otherwise reach the decoder as black.
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       const image = context.getImageData(0, 0, canvas.width, canvas.height);
       try {
