@@ -109,8 +109,8 @@ function WifiQr(props: { record: EpsonRecord }) {
       >
         {(value) => (
           <>
-            {/* SVG markup produced by the qr library from the network text. */}
-            <div class="self-start rounded-lg bg-white p-3" innerHTML={encodeQR(value(), "svg", { scale: 5 })} />
+            {/* SVG markup produced by the qr library. It only sets a viewBox, so the box sets its size. */}
+            <div class="w-56 max-w-full self-start rounded-lg bg-white p-3 [&>svg]:block [&>svg]:h-auto [&>svg]:w-full" innerHTML={encodeQR(value(), "svg")} />
             <p class="break-all font-mono text-xs text-muted">{value()}</p>
           </>
         )}
